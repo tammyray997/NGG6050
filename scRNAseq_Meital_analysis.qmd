@@ -1,0 +1,119 @@
+---
+title: "scRNAseq_hermvsmale_analysis"
+format: html
+editor: visual
+---
+
+## Purpose
+
+The purpose of this code is to analyze/visualize the scRNAseq data from Meital, so that we can better select NPs fo interest to work with in the future
+
+Importing libraries
+
+```{r}
+#| label: loading libraries
+#| output: false
+library(tidyverse)
+```
+
+Reading in files
+
+```{r}
+path2wd <- "/Users/tammyray/Desktop/hart_code"
+setwd(paste0(path2wd,"/data_sheets"))
+dvb_mean_expression <- read_csv("ScRNA_DVB_Meital_Mean_expression.csv")
+colnames(dvb_mean_expression)[1] <- "gene"
+avl <- read_csv("ScRNA_AVL_Meital.csv")
+dvb <- read_csv("ScRNA_DVB_Meital.csv")
+dvc <- read_csv("ScRNA_DVC_Meital.csv")
+```
+
+Tidying the dataframes
+
+```{r}
+colnames(dvb_mean_expression)[2] <- "Herm_mean"
+colnames(dvb_mean_expression)[3] <- "Male_mean"
+
+dvb_mean_expression <- dvb_mean_expression %>%
+  mutate(Herm_mean = round(Herm_mean, digits=4)) %>%
+  mutate(Male_mean = round(Male_mean, digits=4)) %>%
+  mutate(Male_minus_Herm = Male_mean - Herm_mean)
+
+```
+
+```{r}
+#Now I want to make a new dataframe for DVB data, that basically combines my dvb_mean_expression database with logfoldchange and adjusted p value
+
+#First, i will make a new dataframe from dvb that only includes the things I want to add to my new database
+dvb_stripped <- dvb %>%
+  select(-c("p_val", "pct.1", "pct.2", "Comp", "Partition", "Downsample", "Male_threshold", "Herm_threshold", "Male_cells", "Herm_cells"))
+colnames(dvb_stripped)[3] <- "gene"
+
+dvb_all_info <- dvb_mean_expression %>%
+  left_join(dvb_stripped, by = "gene")
+```
+
+```{r}
+# Hmmm, now I want to filter out all non-significant adjusted p values...
+sex_shared_cells <- all_cells %>%
+  filter(ID == "sex-shared")
+write_csv(sex_shared_cells, "Sex_shared_cells.csv")
+```
+
+## How the data looks
+
+I'm curious, how many cells do we need to be able to say something is significant at alpha=0.05 with 80% confidence? If we are looking at large effect sizes, cohen's d=0.8, then we would need around 26 cells... I remember this math from my quant neuro presentation, but here's the code to do that:
+
+```{r}
+#| label: Loading necessary libraries
+#| output: false
+library(pwr)
+```
+
+```{r}
+# Defining my paramenters for the power analysis 
+effect_size <- 0.8  # Cohen's d (large effect size)
+alpha <- 0.05       # Significance level
+power <- 0.8        # Desired power (80%)
+
+# Calculate sample size needed for the given effect size, alpha, and power
+result <- pwr.t.test(d = effect_size, sig.level = alpha, power = power, type = "two.sample")
+print(result)
+```
+
+## ALL CELLS IN C ELEGAN FOR MALE AND HERMAPHRODITE
+
+I downloaded and then organized data from Supplementary Information 4 from [2019 Whole-animal connectomes of both Caenorhabditis elegans sexes](https://www.nature.com/articles/s41586-019-1352-7#Sec27).
+
+**Description:**\
+"Cell Lists These sheets list all of the cells in the *C. elegans* adult nervous system along with end organs as they appear in the connectivity matrices."
+
+**The data contains the following variables**
+
+-   cell_name - the name of each cell in either sex C. elegans
+
+-   cell_type - if it is a sensory neuron, interneuron, muscle, etc.
+
+-   notes_cellCategory
+
+-   ID - if the cell is male-specific, herm-specific, or faoun in both, or in the pharynx
+
+-   notes_sensilla.modality - sensory modality information for SOME of the sex-sahred neurons, also some random notes "interneuron in White et al., 1986"
+
+```{r}
+setwd("/Users/tammyray/Desktop/hart_code/data_sheets")
+all_cells <- read_csv("ALL_adult_c.elegan_cells_Emmons2019_supp_info_4")
+```
+
+## A New day: Making my giant database
+
+I want to make a database that contains all connectome information(synaptic chemical, synaptic electrical, monoaminergic, and neuropeptidergic).
+
+I am writing notes on this in my notion.
+
+First, I want to input the synaptic electrical and chemical databases I have for male and hermaphrodite into r. I want to QC for duplicate entries in the pre and post cell (when I looked at one fo the sheets, I thought I saw the exact same thing for one of them
+
+```{r}
+setwd(paste0(path2wd,"/data_sheets"))
+male_synaptic_connectome_raw <- read_csv("Male_synaptic_connectome.csv")
+```
